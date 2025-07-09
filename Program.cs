@@ -1,65 +1,49 @@
-﻿using MongoDB.Driver;
-using MongoDB.Driver.GridFS;
-using System;
-using System.IO;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.StaticFiles;
+using MongoDB.Driver;
+using WebApi.Services;
 
-namespace MongoDBGridFSExample
-{
-    class Program
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddControllers()
+    .AddNewtonsoftJson(options =>
     {
-        private const string ConnectionString = "mongodb://localhost:27017/";
-        private const string DatabaseName = "praktikadb";
-        private const string VideoFileName = "C:\\Users\\Student\\Videos\\praktika351.mp4";
+        options.SerializerSettings.MaxDepth = 64;
+    });  
 
-        static async Task Main(string[] args)
-        {
-            var client = new MongoClient(ConnectionString);
-            var database = client.GetDatabase(DatabaseName);
-            var gridFSBucket = new GridFSBucket(database);
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 100_000_000; // 100 MB
+    options.ValueLengthLimit = 2048; //  По умолчанию
+    options.MemoryBufferThreshold = 131072;
+});
 
-            try
-            {
-                // Загрузка видео
-                using (var fileStream = File.OpenRead(VideoFileName))
-                {
-                    var options = new GridFSUploadOptions
-                    {
-                        Metadata = new MongoDB.Bson.BsonDocument { { "contentType", "video/mp4" } }  // Замените на правильный тип
-                    };
-                    var videoId = await gridFSBucket.UploadFromStreamAsync(VideoFileName, fileStream, options);
-                    Console.WriteLine($"Video uploaded with ID: {videoId}");
-                }
+builder.Services.AddSingleton<IMongoClient>(s =>
+    new MongoClient(builder.Configuration.GetValue<string>("MongoDb:ConnectionString")));
 
+builder.Services.AddScoped<VideoService>(s =>
+    new VideoService(s.GetRequiredService<IMongoClient>(), builder.Configuration.GetValue<string>("MongoDb:DatabaseName")));
 
-                // Получение информации о файле
-                var filter = Builders<GridFSFileInfo>.Filter.Eq(x => x.Filename, VideoFileName);
-                var fileInfo = await gridFSBucket.FindAsync(filter).Result.FirstOrDefaultAsync();
+builder.Services.AddSingleton<IContentTypeProvider, FileExtensionContentTypeProvider>();
 
-                if (fileInfo != null)
-                {
-                    Console.WriteLine($"Filename: {fileInfo.Filename}");
-                    Console.WriteLine($"Size: {fileInfo.Length}");
-                }
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-                // Скачивание видео
-                string downloadedVideoFileName = "downloaded_video.mp4";
-                using (var streamToDownloadTo = File.Create(downloadedVideoFileName))
-                {
-                    await gridFSBucket.DownloadToStreamByNameAsync(VideoFileName, streamToDownloadTo);
-                    Console.WriteLine($"Video downloaded successfully to {downloadedVideoFileName}");
-                }
+var app = builder.Build();
 
-
-            }
-            catch (FileNotFoundException)
-            {
-                Console.WriteLine($"Error: {VideoFileName} not found");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"An error occurred: {ex.Message}");
-            }
-        }
-    }
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+app.UseHttpsRedirection();
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.UseStaticFiles();
+app.Run();
