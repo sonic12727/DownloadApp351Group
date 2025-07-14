@@ -1,6 +1,4 @@
-﻿using MongoDB.Driver;
-using MongoDB.Driver.GridFS;
-using System;
+using Microsoft.Extensions.Configuration;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -8,41 +6,51 @@ namespace WebApi.Services
 {
     public class VideoService
     {
-        private readonly IGridFSBucket _gridFSBucket;
-        private readonly IMongoDatabase _database;
-        private readonly string _videoContentType = "video/mp4"; // Укажите правильный content type
+        private readonly string _videoUploadPath;
+        private readonly IConfiguration _configuration;
 
-        public VideoService(IMongoClient client, string databaseName)
+        public VideoService(IConfiguration configuration)  // IMongoClient больше не нужен, можно убрать
         {
-            _database = client.GetDatabase(databaseName);
-            _gridFSBucket = new GridFSBucket(_database);
+            _configuration = configuration;
+            _videoUploadPath = configuration["VideoUploadPath"];
         }
 
-        public async Task<string> UploadVideoAsync(Stream stream, string filename)
+        public async Task<string> UploadVideoAsync(Stream stream, string fileName)
         {
-            var options = new GridFSUploadOptions
-            {
-                Metadata = new MongoDB.Bson.BsonDocument { { "contentType", _videoContentType } }
-            };
+            string filePath = Path.Combine(_videoUploadPath, fileName);
 
-            var videoId = await _gridFSBucket.UploadFromStreamAsync(filename, stream, options);
-            return videoId.ToString();
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await stream.CopyToAsync(fileStream);
+            }
+
+            return fileName; // Возвращаем имя файла как ID (для простоты)
         }
 
         public async Task<byte[]> DownloadVideoAsync(string filename)
         {
-            var bytes = await _gridFSBucket.DownloadAsBytesByNameAsync(filename);
-            return bytes;
+            string filePath = Path.Combine(_videoUploadPath, filename);
+
+            if (!File.Exists(filePath))
+            {
+                return null;
+            }
+
+            return await File.ReadAllBytesAsync(filePath);
         }
 
-        public async Task<GridFSFileInfo> GetFileInfoAsync(string filename)
+        public async Task<System.IO.FileInfo> GetFileInfoAsync(string filename)
         {
-            var filter = Builders<GridFSFileInfo>.Filter.Eq(x => x.Filename, filename);
-            var findOptions = new GridFSFindOptions();
-            using (var cursor = await _gridFSBucket.FindAsync(filter, findOptions))
+            string filePath = Path.Combine(_videoUploadPath, filename);
+
+            if (!File.Exists(filePath))
             {
-                return await cursor.FirstOrDefaultAsync();
+                return null;
             }
+
+            System.IO.FileInfo fileInfo = new System.IO.FileInfo(filePath);
+            return fileInfo; // Возвращаем System.IO.FileInfo напрямую
         }
+
     }
 }
