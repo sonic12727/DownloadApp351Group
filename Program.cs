@@ -1,29 +1,27 @@
-using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.StaticFiles;
-using MongoDB.Driver;
-using WebApi.Services;
+using Microsoft.AspNetCore.Http.Features;
+using WebApi.Services; 
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddControllers()
+
+builder.Services.AddControllersWithViews() 
     .AddNewtonsoftJson(options =>
     {
         options.SerializerSettings.MaxDepth = 64;
-    });  
+    });
 
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 100_000_000; // 100 MB
+    options.MultipartBodyLengthLimit = 100_000_000;
     options.ValueLengthLimit = 2048; //  По умолчанию
     options.MemoryBufferThreshold = 131072;
 });
 
-builder.Services.AddSingleton<IMongoClient>(s =>
-    new MongoClient(builder.Configuration.GetValue<string>("MongoDb:ConnectionString")));
+builder.Services.AddScoped<VideoService>(); // Простая регистрация, IConfiguration передается автоматически
 
-builder.Services.AddScoped<VideoService>(s =>
-    new VideoService(s.GetRequiredService<IMongoClient>(), builder.Configuration.GetValue<string>("MongoDb:DatabaseName")));
 
 builder.Services.AddSingleton<IContentTypeProvider, FileExtensionContentTypeProvider>();
 
@@ -32,7 +30,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -41,9 +39,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseStaticFiles();
+
+app.UseRouting();
+
 app.UseAuthorization();
 
 app.MapControllers();
 
-app.UseStaticFiles();
 app.Run();
