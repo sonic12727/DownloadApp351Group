@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Upload and Download</title>
+</head>
+<body>
+
+    <h1>Video Upload and Download</h1>
+
+    <form id="uploadForm" enctype="multipart/form-data">
+        <label for="videoFile">Select Video File:</label>
+        <input type="file" id="videoFile" name="file" accept="video/*">
+        <button type="submit">Upload</button>
+    </form>
+
+    <h2>Uploaded Videos</h2>
+    <ul id="videoList">
+        
+    </ul>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const videoList = document.getElementById('videoList');
+
+        uploadForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const fileInput = document.getElementById('videoFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a video file.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/Videos/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Upload successful:', data);
+                    fetchVideoList(); 
+                } else {
+                    console.error('Upload failed:', response.statusText);
+                    alert('Upload failed: ' + response.statusText);
+                }
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                alert('Error uploading file: ' + error.message);
+            }
+        });
+
+        async function fetchVideoList() {
+            videoList.innerHTML = ''; 
+
+            try {
+                const response = await fetch('/api/Videos/info'); //  Получить список
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const videos = await response.json(); 
+
+                videos.forEach(video => {
+                    const listItem = document.createElement('li');
+                    const downloadLink = document.createElement('a');
+
+                    <a href="/api/Videos/download/MyVideo.mp4" download="MyVideo.mp4">Скачать</a> //  Ссылка на скачивание
+                    downloadLink.textContent = `Download: ${video.filename}`;
+                    downloadLink.download = video.filename; 
+
+                    listItem.appendChild(downloadLink);
+                    videoList.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error('Failed to fetch video list:', error);
+                videoList.innerHTML = '<li>Failed to load videos.</li>';
+            }
+        }
+
+        
+        fetchVideoList();
+    </script>
+
+</body>
+</html>
