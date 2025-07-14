@@ -1,9 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using WebApi.Services;
-using Microsoft.AspNetCore.Http;
-using System.Threading.Tasks;
-using System.IO;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using WebApi.Services;  
+using System;
 
 namespace WebApi.Controllers
 {
@@ -13,7 +11,6 @@ namespace WebApi.Controllers
     {
         private readonly VideoService _videoService;
         private readonly IContentTypeProvider _contentTypeProvider;
-
 
         public VideosController(VideoService videoService, IContentTypeProvider contentTypeProvider)
         {
@@ -56,7 +53,7 @@ namespace WebApi.Controllers
 
                 if (!_contentTypeProvider.TryGetContentType(filename, out var contentType))
                 {
-                    contentType = "application/octet-stream"; // Default if content type is unknown
+                    contentType = "application/octet-stream"; 
                 }
 
                 return File(fileBytes, contentType, filename);
@@ -80,9 +77,9 @@ namespace WebApi.Controllers
 
                 return Ok(new
                 {
-                    Filename = fileInfo.Filename,
+                    Filename = fileInfo.Name, 
                     Length = fileInfo.Length,
-                    UploadDate = fileInfo.UploadDateTime
+                    UploadDate = fileInfo.CreationTime 
                 });
             }
             catch (Exception ex)
